@@ -81,7 +81,7 @@ export default class Tetris extends React.PureComponent<TetrisData, TetrisState>
             // down arrow
             down: 40,
             // s
-            rotate: 89,
+            rotate: 83,
             // d
             pastDown: 68
           }
@@ -97,6 +97,28 @@ export default class Tetris extends React.PureComponent<TetrisData, TetrisState>
     }
 
     this.gameBtHandler = this.gameBtHandler.bind(this)
+    this.breakRowsEvent = this.breakRowsEvent.bind(this)
+    this.gameOverEvent = this.gameOverEvent.bind(this)
+  }
+
+  breakRowsEvent (breakRows: number): void {
+    // breakRows / (stage columns / 2) === +1 level
+    const newBreakRows = this.state.scoreBoard.rows + breakRows
+    const newScore = 10 * (11 * newBreakRows - 1)
+    const level = (this.state.scoreBoard.level >= 20) ? this.state.scoreBoard.level : Math.floor(this.state.sendToStage.stage[0].length / 2) + 1
+
+    this.setState({
+      scoreBoard: {
+        rows: newBreakRows,
+        score: newScore,
+        level
+      }
+    })
+  }
+  gameOverEvent () {
+    this.setState({
+      gameStatus: 'gameOver'
+    })
   }
 
   render () {
@@ -109,6 +131,8 @@ export default class Tetris extends React.PureComponent<TetrisData, TetrisState>
           level={this.state.scoreBoard.level}
           gameStatus={this.state.gameStatus}
           keyCode={this.state.sendToStage.keyCode}
+          breakRowsEvent={this.breakRowsEvent}
+          gameOverEvent={this.gameOverEvent}
         />
         <aside>
           <ScoreBoard {...this.state.scoreBoard} />

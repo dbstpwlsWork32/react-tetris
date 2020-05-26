@@ -5,52 +5,47 @@ const blocks: ModelBlock[] = [
   {
     shape: [
       [true, true, true],
-      [true, false, false],
-      [false, false, false]
+      [true, false, false]
     ],
     background: '#186BD6'
   },
   {
     shape: [
       [true, false, false],
-      [true, true, true],
-      [false, false, false]
+      [true, true, true]
     ],
     background: '#DE651B'
   },
   // ㄱ + ㄴ
   {
     shape: [
-      [false, true, false],
-      [true, true, false],
-      [true, false, false]
+      [false, true],
+      [true, true],
+      [true, false]
     ],
     background: '#ED5056'
   },
   {
     shape: [
-      [true, false, false],
-      [true, true, false],
-      [false, true, false]
+      [true, false],
+      [true, true],
+      [false, true]
     ],
     background: '#4ABA54'
   },
   // ㅡ
   {
     shape: [
-      [true, true, true, true],
-      [false, false, false, false],
-      [false, false, false, false],
-      [false, false, false, false]
+      [true, true, true, true]
     ],
     background: '#68C5DB'
   },
   // ㅗ
   {
     shape: [
-      [true, false, false],
-      [true, true, false],
-      [true, false, false]
+      [true, false],
+      [true, true],
+      [true, false]
     ],
     background: '#C57CEA'
   },
