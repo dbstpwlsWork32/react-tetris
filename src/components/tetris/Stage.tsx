@@ -4,7 +4,8 @@ import { Cell as StyledCell, Stage as StyledStage, Row as StyledRow } from './st
 import getBlock from './logic/block'
 
 interface ModelUserBlockStage extends ModelUserBlock {
-  pos: [number, number][]
+  pos: [number, number][];
+  pastDownPos: [number, number][];
 }
 
 interface StageState {
@@ -85,6 +86,36 @@ export default class Stage extends React.Component<StageProps, StageState> {
 
     return copyStage
   }
+  getblockDropPos(pos: [number, number][], background: string, stage: ModelStage): {pos: [number, number][], background: string} {
+    //  key is rowIndex, value is column index
+    let toCheckPos: { [key: number]: number } = {}
+
+    for (const posItem of pos) {
+      if (!toCheckPos[posItem[0]]) {
+        toCheckPos[posItem[0]] = posItem[1]
+      } else {
+        toCheckPos[posItem[0]] = toCheckPos[posItem[0]] > posItem[1] ? toCheckPos[posItem[0]] : posItem[1]
+      }
+    }
+
+    let minCanMoveYPos = stage[0].length
+    for (const rowIndex in toCheckPos) {
+      let canMoveYPos = 0
+
+      const nowRow = stage[parseInt(rowIndex)]
+      for (let y = toCheckPos[rowIndex] + 1; y < nowRow.length; y++) {
+        if (!nowRow[y].settle) canMoveYPos++
+        else break
+      }
+
+      minCanMoveYPos = Math.min(minCanMoveYPos, canMoveYPos)
+    }
+
+    return {
+      pos: pos.map(posItem => [posItem[0], posItem[1] + minCanMoveYPos]),
+      background: background + 'a3'
+    }
+  }
 
   eventHandler (key: 'addKey' | 'removeKey' | 'addTimer' | 'removeTimer') {
     switch (key) {
@@ -115,6 +146,8 @@ export default class Stage extends React.Component<StageProps, StageState> {
   }
 
   keyboardEvent (e: KeyboardEvent) {
+    this.eventHandler('removeKey')
+    this.eventHandler('removeTimer')
     switch (e.keyCode) {
       case this.props.keyCode.left:
         this.judgeCanMoveAndGridStage([-1, 0])
@@ -129,8 +162,26 @@ export default class Stage extends React.Component<StageProps, StageState> {
         this.rotate()
         break;
       case this.props.keyCode.pastDown:
+
+        const newStandardPos: [number, number] = [
+          this.state.userBlock.pastDownPos.reduce((acc, cur) => Math.min(cur[0], acc), this.state.userBlock.pastDownPos[0][0]),
+          this.state.userBlock.pastDownPos.reduce((acc, cur) => Math.min(cur[1], acc), this.state.userBlock.pastDownPos[0][1])
+        ]
+        this.setState({
+          // remove background userBlock.pos from stage
+          stage: this.getStageRemoveBlock(this.state.userBlock.pos),
+          userBlock: {
+            ...this.state.userBlock,
+            pos: this.state.userBlock.pastDownPos,
+            standardPos: newStandardPos
+          }
+        }, () => {
+          this.blockSettle()
+        })
         break;
     }
+    this.eventHandler('addKey')
+    this.eventHandler('addTimer')
   }
 
   canSettle (positions: [number, number][]) {
@@ -146,7 +197,7 @@ export default class Stage extends React.Component<StageProps, StageState> {
 
     return true
   }
-  blockSettle (): void {
+  blockSettle (): void | false {
     const userBlockSettleStage = this.getStageConcatBlock(this.state.userBlock.pos, this.state.userBlock.background, true)
 
     /*
@@ -200,21 +251,58 @@ export default class Stage extends React.Component<StageProps, StageState> {
       Math.floor((this.state.stage.length - newUserBlockShape.shape.length) / 2),
       0
     ]
-    const newUserBlock: ModelUserBlockStage = {
+    const newBlockPos = this.shapeBlockPosPareser({ ...newUserBlockShape, standardPos })
+    const newBlockPastDown = this.getblockDropPos(newBlockPos, newUserBlockShape.background, breakRowsStage)
+    let newUserBlock: ModelUserBlockStage = {
       ...newUserBlockShape,
-      standardPos: standardPos,
-      pos: this.shapeBlockPosPareser({ ...newUserBlockShape, standardPos })
+      standardPos,
+      pos: newBlockPos,
+      pastDownPos: newBlockPastDown.pos
     }
 
-    // if can't settle gameOver
-    if (!this.canSettle(newUserBlock.pos)) {
-      this.props.gameOverEvent()
-    } else {
+    const doGrid = () => {
+      const stageAddShilhouete = this.getStageConcatBlock(newUserBlock.pastDownPos, newBlockPastDown.background, false, breakRowsStage)
       this.setState({
-        stage: this.getStageConcatBlock(newUserBlock.pos, newUserBlock.background, false, breakRowsStage),
+        stage: this.getStageConcatBlock(newUserBlock.pos, newUserBlock.background, false, stageAddShilhouete),
         userBlock: newUserBlock,
         predictionBlocks: newPredictionBlocks
       })
+    }
+
+    // if can't settle gameOver
+    if (!this.canSettle(newBlockPos)) {
+      const tryBlockMove = (xPos: number): boolean => {
+        const tryMoveUserBlock = {...newUserBlock}
+        const xMover = xPos - tryMoveUserBlock.standardPos[0]
+        tryMoveUserBlock.standardPos = [xPos, tryMoveUserBlock.standardPos[1]]
+        tryMoveUserBlock.pos = tryMoveUserBlock.pos.map(posItem => [posItem[0] + xMover, posItem[1]])
+  
+        if (this.canSettle(tryMoveUserBlock.pos)) {
+          tryMoveUserBlock.pastDownPos = this.getblockDropPos(tryMoveUserBlock.pos, tryMoveUserBlock.background, breakRowsStage).pos
+          newUserBlock = tryMoveUserBlock
+          doGrid()
+
+          return true
+        } else {
+          return false
+        }
+      }
+      // try x move right
+      for (let xPos = newUserBlock.standardPos[0] + 1; xPos < this.state.stage.length; xPos++) {
+        if (tryBlockMove(xPos)) {
+          return false
+        }
+      }
+      // try x move left
+      for (let xPos = newUserBlock.standardPos[0] - 1; xPos > -1; xPos--) {
+        if (tryBlockMove(xPos)) {
+          return false
+        }
+      }
+
+      this.props.gameOverEvent()
+    } else {
+      doGrid()
     }
     /*
       set new userBlock [end]
@@ -228,7 +316,17 @@ export default class Stage extends React.Component<StageProps, StageState> {
 
     if (this.canSettle(moverBlock.pos)) {
       // remove PrevBlockStage
-      const stageRemovePrevUserBlock = this.getStageRemoveBlock(this.state.userBlock.pos)
+      let stageRemovePrevUserBlock = this.getStageRemoveBlock(this.state.userBlock.pos)
+
+      // if move x pos, grid new shilhouete
+      if (mover[0] !== 0) {
+        stageRemovePrevUserBlock = this.getStageRemoveBlock(this.state.userBlock.pastDownPos, stageRemovePrevUserBlock)
+        const newPastDown = this.getblockDropPos(moverBlock.pos, moverBlock.background, stageRemovePrevUserBlock)
+
+        moverBlock.pastDownPos = newPastDown.pos
+
+        stageRemovePrevUserBlock = this.getStageConcatBlock(newPastDown.pos, newPastDown.background, false, stageRemovePrevUserBlock)
+      }
 
       // set stage by userBlock, settle is false
       this.setState({
@@ -242,11 +340,7 @@ export default class Stage extends React.Component<StageProps, StageState> {
     }
   }
   drop () {
-    this.eventHandler('removeKey')
-    this.eventHandler('removeTimer')
     if (!this.judgeCanMoveAndGridStage([0, 1])) this.blockSettle()
-    this.eventHandler('addKey')
-    this.eventHandler('addTimer')
   }
   rotate () {
     const shape = [...this.state.userBlock.shape]
@@ -264,15 +358,23 @@ export default class Stage extends React.Component<StageProps, StageState> {
 
 
     const doSettle = () => {
+      // remove PrevBlockStage
+      let newStage = this.getStageRemoveBlock(this.state.userBlock.pos.concat(this.state.userBlock.pastDownPos))
+
+      // grid new shilhouete
+      const newPastDownBlock = this.getblockDropPos(rotatePos, this.state.userBlock.background, newStage)
+
+      newStage = this.getStageConcatBlock(newPastDownBlock.pos, newPastDownBlock.background, false, newStage)
+      newStage = this.getStageConcatBlock(rotatePos, this.state.userBlock.background, false, newStage)
+
       this.setState({
         userBlock: {
           ...this.state.userBlock,
           shape: rotateShape,
-          pos: rotatePos
+          pos: rotatePos,
+          pastDownPos: newPastDownBlock.pos
         },
-        stage: this.getStageRemoveBlock(this.state.userBlock.pos)
-      }, () => {
-        this.judgeCanMoveAndGridStage([0, 0])
+        stage: newStage
       })
     }
 
@@ -298,11 +400,15 @@ export default class Stage extends React.Component<StageProps, StageState> {
     super(props)
 
     const userBlockPos = this.shapeBlockPosPareser(props.dataUserBlock)
+    const pastDownPosBlock = this.getblockDropPos(userBlockPos, props.dataUserBlock.background, props.dataStage)
+    
+    const stageAddShilhouete = this.getStageConcatBlock(pastDownPosBlock.pos, pastDownPosBlock.background, false, props.dataStage)
     this.state = {
-      stage: this.getStageConcatBlock(userBlockPos, props.dataUserBlock.background, false, props.dataStage),
+      stage: this.getStageConcatBlock(userBlockPos, props.dataUserBlock.background, false, stageAddShilhouete),
       userBlock: {
         ...props.dataUserBlock,
-        pos: userBlockPos
+        pos: userBlockPos,
+        pastDownPos: pastDownPosBlock.pos
       },
       predictionBlocks: props.dataPredictionBlocks
     }
