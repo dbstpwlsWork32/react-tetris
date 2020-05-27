@@ -105,7 +105,7 @@ export default class Tetris extends React.PureComponent<TetrisData, TetrisState>
     // breakRows / (stage columns / 2) === +1 level
     const newBreakRows = this.state.scoreBoard.rows + breakRows
     const newScore = 10 * (11 * newBreakRows - 1)
-    const level = (this.state.scoreBoard.level >= 20) ? this.state.scoreBoard.level : Math.floor(this.state.sendToStage.stage[0].length / 2) + 1
+    const level = (this.state.scoreBoard.level >= 20) ? this.state.scoreBoard.level : Math.floor(newBreakRows / this.state.sendToStage.stage[0].length / 2) + 1
 
     this.setState({
       scoreBoard: {
