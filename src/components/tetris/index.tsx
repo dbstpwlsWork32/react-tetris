@@ -43,6 +43,15 @@ export default class Tetris extends React.PureComponent<TetrisData, TetrisState>
         })
         break;
       default:
+        if (this.state.gameStatus === 'gameOver') {
+          this.setState({
+            scoreBoard: {
+              level: 1,
+              rows: 0,
+              score: 0
+            }
+          })
+        }
         this.setState({
           gameStatus: 'play'
         })
