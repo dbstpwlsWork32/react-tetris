@@ -417,6 +417,35 @@ export default class Stage extends React.Component<StageProps, StageState> {
     this.timerEvent = this.timerEvent.bind(this)
   }
 
+  componentDidUpdate (prevProps: StageProps) {
+    if (prevProps.gameStatus === 'gameOver' && this.props.gameStatus === 'play') {
+      const clearStage: ModelStage = this.state.stage.map(row => row.map(() => ({ background: '', settle: false })))
+
+      const userBlockShape = getBlock()
+      const block: ModelUserBlock = {
+        ...userBlockShape,
+        standardPos: [Math.floor((this.state.stage.length - userBlockShape.shape.length) / 2), 0]
+      }
+      const blockPos = this.shapeBlockPosPareser(block)
+      const dropObj = this.getblockDropPos(blockPos, block.background, clearStage)
+
+      const newUserBlock: ModelUserBlockStage = {
+        ...block,
+        pos: blockPos,
+        pastDownPos: dropObj.pos
+      }
+
+      const stageAddUserBlock = this.getStageConcatBlock(blockPos, block.background, false, clearStage)
+
+      const stageAddShilhouete = this.getStageConcatBlock(dropObj.pos, dropObj.background, false, stageAddUserBlock)
+      this.setState({
+        stage: stageAddShilhouete,
+        predictionBlocks: this.state.predictionBlocks.map(() => getBlock()),
+        userBlock: newUserBlock
+      })
+    }
+  }
+
   componentWillUnmount () {
     this.eventHandler('removeKey')
     this.eventHandler('removeTimer')
